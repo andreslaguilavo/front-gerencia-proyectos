@@ -20,6 +20,23 @@ export interface Pedido {
   total: number
 }
 
+export interface PedidoFront {
+  id: number
+  usuario_id: number | null
+  estado: 'pendiente' | 'confirmado' | 'enviado' | 'cancelado'
+  items: DetallePedidoFront[]
+  total: number
+  fecha: string
+}
+
+export interface DetallePedidoFront {
+  producto_id: number
+  producto_nombre: string
+  cantidad: number
+  precio_unitario: number
+  subtotal: number
+}
+
 export interface CrearPedidoRequest {
   usuario_id?: number | null
   items: {
@@ -33,24 +50,56 @@ export interface CambiarEstadoRequest {
   estado: 'pendiente' | 'confirmado' | 'enviado' | 'cancelado'
 }
 
+export const estadoColors: Record<
+  PedidoFront['estado'],
+  { bg: string; text: string; badge: string }
+> = {
+  pendiente: {
+    bg: 'bg-yellow-50',
+    text: 'text-yellow-800',
+    badge: 'bg-yellow-500'
+  },
+  confirmado: { bg: 'bg-blue-50', text: 'text-blue-800', badge: 'bg-blue-500' },
+  enviado: { bg: 'bg-green-50', text: 'text-green-800', badge: 'bg-green-500' },
+  cancelado: { bg: 'bg-red-50', text: 'text-red-800', badge: 'bg-red-500' }
+}
+
+export const estadoLabels: Record<PedidoFront['estado'], string> = {
+  pendiente: '⏳ Pendiente',
+  confirmado: '✅ Confirmado',
+  enviado: '🚚 Enviado',
+  cancelado: '❌ Cancelado'
+}
+
 // --- Servicios de Pedidos ---
+// NOTA: El backend NO tiene GET /pedidos/ para listar todos
 
 /**
  * Crear un nuevo pedido
  * POST /pedidos/
+ * NO enviar 'id' porque es SERIAL (auto-generado por PostgreSQL)
  */
 export async function crearPedido(pedido: CrearPedidoRequest): Promise<Pedido> {
+  // Construir el payload sin IDs (SERIAL los genera automáticamente)
+  const payload = {
+    usuario_id: pedido.usuario_id ?? null,
+    estado: 'pendiente',
+    items: pedido.items.map((item) => ({
+      producto_id: item.producto_id,
+      cantidad: item.cantidad,
+      precio_unitario: item.precio_unitario ?? null
+      // NO enviar pedido_id, se asigna en el backend
+    })),
+    total: 0 // El backend lo calcula
+    // NO enviar id, PostgreSQL lo genera con SERIAL
+  }
+
   const response = await fetch(`${API_BASE_URL}/pedidos/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      usuario_id: pedido.usuario_id,
-      estado: 'pendiente',
-      items: pedido.items,
-      total: 0
-    })
+    body: JSON.stringify(payload)
   })
 
   if (!response.ok) {
@@ -116,66 +165,4 @@ export async function cambiarEstadoPedido(
   }
 
   return response.json()
-}
-
-// import { Pedido as PedidoBackend, DetallePedido } from '@/app/services/orders'
-
-export interface PedidoFront {
-  id: number
-  usuario_id: number | null
-  estado: 'pendiente' | 'confirmado' | 'enviado' | 'cancelado'
-  items: DetallePedidoFront[]
-  total: number
-  fecha: string
-}
-
-export interface DetallePedidoFront {
-  producto_id: number
-  producto_nombre: string
-  cantidad: number
-  precio_unitario: number
-  subtotal: number
-}
-
-// Helper para mapear pedido del backend al frontend
-export function mapPedidoToFront(
-  pedido: Pedido,
-  productosMap?: Map<number, string>
-): PedidoFront {
-  return {
-    id: pedido.id ?? 0,
-    usuario_id: pedido.usuario_id,
-    estado: pedido.estado,
-    items: pedido.items.map((item) => ({
-      producto_id: item.producto_id,
-      producto_nombre:
-        productosMap?.get(item.producto_id) || `Producto #${item.producto_id}`,
-      cantidad: item.cantidad,
-      precio_unitario: item.precio_unitario ?? 0,
-      subtotal: (item.precio_unitario ?? 0) * item.cantidad
-    })),
-    total: pedido.total,
-    fecha: new Date().toISOString() // El backend no devuelve fecha, usar fecha actual
-  }
-}
-
-export const estadoColors: Record<
-  PedidoFront['estado'],
-  { bg: string; text: string; badge: string }
-> = {
-  pendiente: {
-    bg: 'bg-yellow-50',
-    text: 'text-yellow-800',
-    badge: 'bg-yellow-500'
-  },
-  confirmado: { bg: 'bg-blue-50', text: 'text-blue-800', badge: 'bg-blue-500' },
-  enviado: { bg: 'bg-green-50', text: 'text-green-800', badge: 'bg-green-500' },
-  cancelado: { bg: 'bg-red-50', text: 'text-red-800', badge: 'bg-red-500' }
-}
-
-export const estadoLabels: Record<PedidoFront['estado'], string> = {
-  pendiente: '⏳ Pendiente',
-  confirmado: '✅ Confirmado',
-  enviado: '🚚 Enviado',
-  cancelado: '❌ Cancelado'
 }

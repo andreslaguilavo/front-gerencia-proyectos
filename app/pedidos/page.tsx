@@ -14,33 +14,53 @@ import {
   ShoppingBag
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { PedidoFront, estadoColors, estadoLabels } from '@/app/services/orders'
 
 export default function OrdersPage() {
+  const router = useRouter()
   const [orders, setOrders] = useState<PedidoFront[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set())
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
+  const [user, setUser] = useState<{
+    id?: number
+    name: string
+    email: string
+    rol?: string
+  } | null>(null)
 
   useEffect(() => {
-    // Cargar usuario del localStorage
+    // Verificar si hay usuario logueado
     const savedUser = localStorage.getItem('user')
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
+    if (!savedUser) {
+      // Si no hay usuario, redirigir al login
+      router.push('/login')
+      return
     }
 
-    // Cargar pedidos del localStorage (simulado)
-    // En producción, aquí llamarías a la API para obtener pedidos del usuario
-    const loadOrders = async () => {
+    setUser(JSON.parse(savedUser))
+
+    // Cargar pedidos del localStorage
+    const loadOrders = () => {
       try {
         setLoading(true)
 
-        // Obtener pedidos del localStorage
-        const savedOrders = localStorage.getItem('orders')
-        if (savedOrders) {
-          const parsedOrders = JSON.parse(savedOrders)
-          setOrders(parsedOrders)
+        const pedidosLocal = localStorage.getItem('orders')
+
+        if (pedidosLocal) {
+          const pedidos: PedidoFront[] = JSON.parse(pedidosLocal)
+
+          // Filtrar pedidos del usuario actual
+          const userFromStorage = JSON.parse(savedUser)
+          const pedidosUsuario = userFromStorage.id
+            ? pedidos.filter((p) => p.usuario_id === userFromStorage.id)
+            : pedidos
+
+          // Ordenar por ID descendente (más recientes primero)
+          pedidosUsuario.sort((a, b) => b.id - a.id)
+
+          setOrders(pedidosUsuario)
         } else {
           setOrders([])
         }
@@ -48,7 +68,7 @@ export default function OrdersPage() {
         setError(null)
       } catch (err) {
         console.error('Error al cargar pedidos:', err)
-        setError('No se pudieron cargar los pedidos')
+        setError('No se pudieron cargar los pedidos.')
         setOrders([])
       } finally {
         setLoading(false)
@@ -56,7 +76,7 @@ export default function OrdersPage() {
     }
 
     loadOrders()
-  }, [])
+  }, [router])
 
   const toggleOrderExpansion = (orderId: number) => {
     setExpandedOrders((prev) => {
@@ -96,24 +116,29 @@ export default function OrdersPage() {
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100'>
-      {/* Header */}
-      <header className='bg-white shadow-sm sticky top-0 z-50'>
-        <div className='container mx-auto px-4 py-4'>
-          <div className='flex items-center justify-between'>
-            <Link href='/'>
-              <Button variant='ghost' className='hover:bg-gray-100'>
-                <ArrowLeft className='w-4 h-4 mr-2' />
-                Volver a la tienda
-              </Button>
-            </Link>
-            <h1 className='text-2xl font-bold text-gray-800'>Mis Pedidos</h1>
-            {user && <div className='text-sm text-gray-600'>{user.name}</div>}
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className='container mx-auto px-4 py-8'>
+        <div className='mb-8'>
+          <Link href='/'>
+            <Button variant='ghost' className='mb-4 hover:bg-gray-100'>
+              <ArrowLeft className='w-4 h-4 mr-2' />
+              Volver a la tienda
+            </Button>
+          </Link>
+          <div className='flex items-center justify-between'>
+            <div>
+              <h1 className='text-4xl font-bold text-gray-800 mb-2'>
+                Mis Pedidos
+              </h1>
+              {user && (
+                <p className='text-gray-600'>
+                  {user.name} • {user.email}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {error && (
           <div className='mb-6 p-4 bg-red-50 border border-red-200 rounded-lg'>
             <p className='text-red-800'>{error}</p>
@@ -141,6 +166,9 @@ export default function OrdersPage() {
               const isExpanded = expandedOrders.has(order.id)
               const colors = estadoColors[order.estado]
 
+              // Generar número de pedido aleatorio entre 1 y 1,000,000
+              const randomOrderNumber = Math.floor(Math.random() * 1000000) + 1
+
               return (
                 <div
                   key={order.id}
@@ -158,7 +186,8 @@ export default function OrdersPage() {
                         </div>
                         <div>
                           <h3 className='font-bold text-lg'>
-                            Pedido #{order.id}
+                            Pedido #
+                            {randomOrderNumber.toString().padStart(6, '0')}
                           </h3>
                           <p className='text-sm text-gray-600'>
                             {new Date(order.fecha).toLocaleDateString('es-ES', {
