@@ -1,15 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Mail, Lock, Eye, EyeOff, User } from 'lucide-react'
+import {
+  ArrowLeft,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  User,
+  AlertCircle
+} from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { loginUsuario, registrarUsuario } from '@/app/services/users'
+import { useCart } from '@/context/CartContext'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { setUser } = useCart() // Obtener setUser del contexto
   const [isLogin, setIsLogin] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -17,38 +31,151 @@ export default function LoginPage() {
     confirmPassword: ''
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (isLogin) {
-      // Login logic
-      if (formData.email && formData.password) {
-        localStorage.setItem(
-          'user',
-          JSON.stringify({
-            name: formData.name || formData.email.split('@')[0],
-            email: formData.email
-          })
-        )
+  // Verificar si ya hay usuario logueado
+  useEffect(() => {
+    const checkAuth = () => {
+      const user = localStorage.getItem('user')
+      if (user) {
+        // Si hay usuario logueado, redirigir al inicio
         router.push('/')
-      }
-    } else {
-      // Register logic
-      if (
-        formData.name &&
-        formData.email &&
-        formData.password === formData.confirmPassword
-      ) {
-        localStorage.setItem(
-          'user',
-          JSON.stringify({
-            name: formData.name,
-            email: formData.email
-          })
-        )
-        router.push('/')
+      } else {
+        setCheckingAuth(false)
       }
     }
+
+    checkAuth()
+  }, [router])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    try {
+      if (isLogin) {
+        // Validaciones de login
+        if (!formData.email || !formData.password) {
+          setError('Por favor completa todos los campos')
+          return
+        }
+
+        if (!formData.email.includes('@')) {
+          setError('Por favor ingresa un email válido')
+          return
+        }
+
+        setLoading(true)
+
+        const usuario = await loginUsuario(formData.email, formData.password)
+
+        // Crear objeto de usuario
+        const userData = {
+          id: usuario.id,
+          name: usuario.nombre,
+          email: usuario.email,
+          rol: usuario.rol
+        }
+
+        // Guardar usuario en localStorage
+        localStorage.setItem('user', JSON.stringify(userData))
+
+        // Actualizar el contexto
+        setUser(userData)
+
+        // Redirigir a la página principal
+        router.push('/')
+      } else {
+        // Validaciones de registro
+        if (!formData.name || !formData.email || !formData.password) {
+          setError('Por favor completa todos los campos')
+          return
+        }
+
+        if (!formData.email.includes('@')) {
+          setError('Por favor ingresa un email válido')
+          return
+        }
+
+        if (formData.name.length < 3) {
+          setError('El nombre debe tener al menos 3 caracteres')
+          return
+        }
+
+        if (formData.password !== formData.confirmPassword) {
+          setError('Las contraseñas no coinciden')
+          return
+        }
+
+        if (formData.password !== 'password') {
+          setError(
+            'Por seguridad, usa la contraseña temporal del sistema: "password"'
+          )
+          return
+        }
+
+        setLoading(true)
+
+        const usuario = await registrarUsuario(formData.name, formData.email)
+
+        // Crear objeto de usuario
+        const userData = {
+          id: usuario.id,
+          name: usuario.nombre,
+          email: usuario.email,
+          rol: usuario.rol
+        }
+
+        // Guardar usuario en localStorage
+        localStorage.setItem('user', JSON.stringify(userData))
+
+        // Actualizar el contexto
+        setUser(userData)
+
+        // Redirigir a la página principal
+        router.push('/')
+      }
+    } catch (err) {
+      // Manejo de errores amigable
+      let errorMessage = 'Ocurrió un error inesperado'
+
+      if (err instanceof Error) {
+        const message = err.message.toLowerCase()
+
+        if (message.includes('contraseña incorrecta')) {
+          errorMessage = '❌ Contraseña incorrecta'
+        } else if (message.includes('usuario no encontrado')) {
+          errorMessage = '👤 No encontramos una cuenta con este email'
+        } else if (message.includes('usuario inactivo')) {
+          errorMessage = '🚫 Tu cuenta está inactiva. Contacta al administrador'
+        } else if (message.includes('email ya está registrado')) {
+          errorMessage =
+            '📧 Este email ya está registrado. Intenta iniciar sesión'
+        } else if (message.includes('fetch') || message.includes('network')) {
+          errorMessage =
+            '🌐 Error de conexión. Verifica que el servidor esté activo'
+        } else {
+          errorMessage = err.message
+        }
+      }
+
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Mostrar pantalla de carga mientras verifica autenticación
+  if (checkingAuth) {
+    return (
+      <div className='min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center'>
+        <div className='text-center'>
+          <div className='w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4'>
+            <span className='text-3xl font-bold text-green-600'>S</span>
+          </div>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4'></div>
+          <p className='text-gray-600 font-medium'>Verificando sesión...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -90,7 +217,16 @@ export default function LoginPage() {
             {/* Toggle Tabs */}
             <div className='flex mb-8 bg-gray-100 rounded-lg p-1'>
               <button
-                onClick={() => setIsLogin(true)}
+                onClick={() => {
+                  setIsLogin(true)
+                  setError(null)
+                  setFormData({
+                    name: '',
+                    email: '',
+                    password: '',
+                    confirmPassword: ''
+                  })
+                }}
                 className={`flex-1 py-2 px-4 rounded-md font-semibold transition-all ${
                   isLogin
                     ? 'bg-white text-green-600 shadow-sm'
@@ -100,7 +236,16 @@ export default function LoginPage() {
                 Iniciar Sesión
               </button>
               <button
-                onClick={() => setIsLogin(false)}
+                onClick={() => {
+                  setIsLogin(false)
+                  setError(null)
+                  setFormData({
+                    name: '',
+                    email: '',
+                    password: '',
+                    confirmPassword: ''
+                  })
+                }}
                 className={`flex-1 py-2 px-4 rounded-md font-semibold transition-all ${
                   !isLogin
                     ? 'bg-white text-green-600 shadow-sm'
@@ -110,6 +255,26 @@ export default function LoginPage() {
                 Registrarse
               </button>
             </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className='mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 animate-shake'>
+                <AlertCircle className='w-5 h-5 text-red-600 flex-shrink-0 mt-0.5' />
+                <div className='flex-1'>
+                  <p className='text-sm text-red-800 font-medium'>{error}</p>
+                  {error.includes('contraseña') && (
+                    <div className='mt-2 p-2 bg-red-100 rounded border border-red-200'>
+                      <p className='text-xs text-red-700'>
+                        💡 <strong>Contraseña temporal del sistema:</strong>{' '}
+                        <code className='bg-white px-2 py-1 rounded font-mono text-red-800'>
+                          password
+                        </code>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className='space-y-5'>
               {/* Name Field (Register only) */}
@@ -129,6 +294,8 @@ export default function LoginPage() {
                       className='w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none transition-colors'
                       placeholder='Juan Pérez'
                       required={!isLogin}
+                      disabled={loading}
+                      minLength={3}
                     />
                   </div>
                 </div>
@@ -150,6 +317,7 @@ export default function LoginPage() {
                     className='w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none transition-colors'
                     placeholder='tu@email.com'
                     required
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -170,11 +338,13 @@ export default function LoginPage() {
                     className='w-full pl-11 pr-11 py-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none transition-colors'
                     placeholder='••••••••'
                     required
+                    disabled={loading}
                   />
                   <button
                     type='button'
                     onClick={() => setShowPassword(!showPassword)}
                     className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600'
+                    disabled={loading}
                   >
                     {showPassword ? (
                       <EyeOff className='w-5 h-5' />
@@ -205,108 +375,30 @@ export default function LoginPage() {
                       className='w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none transition-colors'
                       placeholder='••••••••'
                       required={!isLogin}
+                      disabled={loading}
                     />
                   </div>
-                </div>
-              )}
-
-              {/* Forgot Password (Login only) */}
-              {isLogin && (
-                <div className='flex items-center justify-between text-sm'>
-                  <label className='flex items-center'>
-                    <input
-                      type='checkbox'
-                      className='w-4 h-4 text-green-600 rounded'
-                    />
-                    <span className='ml-2 text-gray-600'>Recordarme</span>
-                  </label>
-                  <a
-                    href='#'
-                    className='text-green-600 hover:text-green-700 font-semibold'
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </a>
                 </div>
               )}
 
               {/* Submit Button */}
               <Button
                 type='submit'
-                className='w-full h-12 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold text-lg shadow-lg hover:shadow-xl transition-all'
+                disabled={loading}
+                className='w-full h-12 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold text-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed'
               >
-                {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
+                {loading ? (
+                  <div className='flex items-center gap-2'>
+                    <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white'></div>
+                    {isLogin ? 'Iniciando sesión...' : 'Creando cuenta...'}
+                  </div>
+                ) : (
+                  <>{isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}</>
+                )}
               </Button>
             </form>
-
-            {/* Social Login */}
-            {/* <div className='mt-6'>
-              <div className='relative'>
-                <div className='absolute inset-0 flex items-center'>
-                  <div className='w-full border-t border-gray-200' />
-                </div>
-                <div className='relative flex justify-center text-sm'>
-                  <span className='px-4 bg-white text-gray-500'>
-                    O continuar con
-                  </span>
-                </div>
-              </div>
-
-              <div className='mt-6 grid grid-cols-2 gap-4'>
-                <Button
-                  type='button'
-                  variant='outline'
-                  className='h-11 border-2 hover:bg-gray-50'
-                >
-                  <svg className='w-5 h-5 mr-2' viewBox='0 0 24 24'>
-                    <path
-                      fill='currentColor'
-                      d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'
-                    />
-                    <path
-                      fill='currentColor'
-                      d='M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'
-                    />
-                    <path
-                      fill='currentColor'
-                      d='M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z'
-                    />
-                    <path
-                      fill='currentColor'
-                      d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
-                    />
-                  </svg>
-                  Google
-                </Button>
-                <Button
-                  type='button'
-                  variant='outline'
-                  className='h-11 border-2 hover:bg-gray-50'
-                >
-                  <svg
-                    className='w-5 h-5 mr-2'
-                    fill='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path d='M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z' />
-                  </svg>
-                  Facebook
-                </Button>
-              </div>
-            </div> */}
           </div>
         </div>
-
-        {/* Footer */}
-        <p className='text-center text-sm text-gray-600 mt-6'>
-          Al continuar, aceptas nuestros{' '}
-          <a href='#' className='text-green-600 hover:underline font-semibold'>
-            Términos de Servicio
-          </a>{' '}
-          y{' '}
-          <a href='#' className='text-green-600 hover:underline font-semibold'>
-            Política de Privacidad
-          </a>
-        </p>
       </div>
     </div>
   )
