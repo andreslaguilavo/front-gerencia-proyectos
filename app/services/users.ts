@@ -99,7 +99,6 @@ export async function crearUsuario(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      id: null,
       nombre: usuario.nombre,
       email: usuario.email,
       rol: usuario.rol || 'user',
