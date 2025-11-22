@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { ShoppingCart, User, LogOut, Package } from 'lucide-react'
+import { ShoppingCart, User, LogOut, Package, ShieldHalf } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -59,6 +59,19 @@ export default function Header({
                 >
                   <Package className='w-4 h-4 mr-2' />
                   Mis Pedidos
+                </Button>
+              </Link>
+              <Link href='/admin'>
+                <Button
+                  variant='ghost'
+                  className={`${
+                    pathname === '/admin'
+                      ? 'bg-green-50 text-green-700'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <ShieldHalf className='w-4 h-4 mr-2' />
+                  Admin
                 </Button>
               </Link>
             </nav>

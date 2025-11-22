@@ -7,6 +7,7 @@ import {
   useEffect,
   ReactNode
 } from 'react'
+import { useRouter } from 'next/navigation'
 
 export interface CartItem {
   id: number
@@ -46,6 +47,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const router = useRouter()
 
   // Cargar carrito y usuario del localStorage
   useEffect(() => {
@@ -114,7 +116,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem('user')
+    localStorage.removeItem('cart')
+    router.push('/login')
   }
 
   return (
