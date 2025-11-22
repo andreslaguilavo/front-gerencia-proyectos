@@ -15,8 +15,9 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { obtenerProducto, Producto } from '@/app/services/products'
 
-interface Product {
+interface ProductoFront {
   id: number
   name: string
   price: number
@@ -37,8 +38,32 @@ interface Product {
   }
 }
 
-interface CartItem extends Product {
+interface CartItem extends ProductoFront {
   quantity: number
+}
+
+// Función para mapear Producto del backend a ProductoFront
+function mapProductoToFront(producto: Producto): ProductoFront {
+  return {
+    id: producto.id ?? 0,
+    name: producto.nombre,
+    price: producto.precio,
+    description: producto.descripcion,
+    longDescription: producto.descripcion,
+    stock: producto.cantidad,
+    image: `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=800&fit=crop`,
+    category: 'Alimentos',
+    weight: '500g',
+    origin: 'Local',
+    rating: 4.5,
+    reviews: 0,
+    nutritionalInfo: {
+      calories: 'N/A',
+      protein: 'N/A',
+      carbs: 'N/A',
+      fat: 'N/A'
+    }
+  }
 }
 
 export default function ProductDetailPage({
@@ -48,198 +73,40 @@ export default function ProductDetailPage({
 }) {
   const router = useRouter()
   const resolvedParams = use(params)
-  const productId = resolvedParams.id
-  const [product, setProduct] = useState<Product | null>(null)
+  const productId = parseInt(resolvedParams.id)
+  const [product, setProduct] = useState<ProductoFront | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [isFavorite, setIsFavorite] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Productos de ejemplo - Alimentos (same as main page)
-    const products: Product[] = [
-      {
-        id: 1,
-        name: 'Aguacate Hass Premium',
-        price: 4.99,
-        image:
-          'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=800&h=800&fit=crop',
-        description: 'Aguacates frescos y cremosos',
-        category: 'Frutas',
-        longDescription:
-          'Aguacates Hass de primera calidad, perfectamente maduros y listos para consumir. Cultivados de forma sostenible en las mejores tierras, estos aguacates ofrecen una textura cremosa y un sabor excepcional. Ideales para ensaladas, tostadas, guacamole o como acompañamiento saludable.',
-        stock: 0,
-        weight: '250g (unidad)',
-        origin: 'Colombia',
-        rating: 4.8,
-        reviews: 124,
-        nutritionalInfo: {
-          calories: '160 kcal',
-          protein: '2g',
-          carbs: '9g',
-          fat: '15g'
-        }
-      },
-      {
-        id: 2,
-        name: 'Salmón Fresco Atlántico',
-        price: 18.99,
-        image:
-          'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800&h=800&fit=crop',
-        description: 'Filete de salmón de alta calidad',
-        category: 'Pescados',
-        longDescription:
-          'Filete de salmón atlántico fresco, rico en omega-3 y proteínas de alta calidad. Pescado de manera sostenible y procesado el mismo día para garantizar máxima frescura. Perfecto para asar, hornear o preparar a la plancha.',
-        stock: 25,
-        weight: '400g',
-        origin: 'Noruega',
-        rating: 4.9,
-        reviews: 89,
-        nutritionalInfo: {
-          calories: '206 kcal',
-          protein: '22g',
-          carbs: '0g',
-          fat: '13g'
-        }
-      },
-      {
-        id: 3,
-        name: 'Queso Mozzarella Fresco',
-        price: 7.99,
-        image:
-          'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=800&h=800&fit=crop',
-        description: 'Mozzarella artesanal italiana',
-        category: 'Lácteos',
-        longDescription:
-          'Mozzarella fresca elaborada de forma artesanal siguiendo recetas tradicionales italianas. Textura suave y cremosa, perfecta para ensaladas caprese, pizzas caseras o para disfrutar sola con un toque de aceite de oliva y albahaca fresca.',
-        stock: 40,
-        weight: '250g',
-        origin: 'Italia',
-        rating: 4.7,
-        reviews: 156,
-        nutritionalInfo: {
-          calories: '280 kcal',
-          protein: '18g',
-          carbs: '3g',
-          fat: '22g'
-        }
-      },
-      {
-        id: 4,
-        name: 'Aceite de Oliva Virgen Extra',
-        price: 12.99,
-        image:
-          'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=800&h=800&fit=crop',
-        description: 'Aceite premium de primera extracción',
-        category: 'Aceites',
-        longDescription:
-          'Aceite de oliva virgen extra de primera extracción en frío. Proveniente de olivares centenarios en Andalucía, este aceite premium ofrece un sabor afrutado y equilibrado. Ideal para aliñar ensaladas, marinar carnes o simplemente disfrutar con pan artesanal.',
-        stock: 60,
-        weight: '500ml',
-        origin: 'España',
-        rating: 4.9,
-        reviews: 203,
-        nutritionalInfo: {
-          calories: '884 kcal',
-          protein: '0g',
-          carbs: '0g',
-          fat: '100g'
-        }
-      },
-      {
-        id: 5,
-        name: 'Tomates Cherry Orgánicos',
-        price: 5.49,
-        image:
-          'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=800&h=800&fit=crop',
-        description: 'Tomates dulces y jugosos',
-        category: 'Verduras',
-        longDescription:
-          'Tomates cherry orgánicos cultivados sin pesticidas ni químicos. Pequeños, dulces y llenos de sabor, estos tomates son perfectos para ensaladas, pasta, aperitivos o simplemente para picar. Cosechados en su punto óptimo de maduración.',
-        stock: 75,
-        weight: '300g',
-        origin: 'Local',
-        rating: 4.6,
-        reviews: 98,
-        nutritionalInfo: {
-          calories: '18 kcal',
-          protein: '1g',
-          carbs: '4g',
-          fat: '0.2g'
-        }
-      },
-      {
-        id: 6,
-        name: 'Pan Integral Artesanal',
-        price: 4.49,
-        image:
-          'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=800&fit=crop',
-        description: 'Pan recién horneado con granos',
-        category: 'Panadería',
-        longDescription:
-          'Pan integral artesanal elaborado con harina de trigo integral, semillas de girasol, lino y sésamo. Horneado diariamente siguiendo métodos tradicionales. Alto en fibra y con un sabor robusto que complementa cualquier comida. Sin conservantes artificiales.',
-        stock: 30,
-        weight: '500g',
-        origin: 'Local',
-        rating: 4.8,
-        reviews: 145,
-        nutritionalInfo: {
-          calories: '247 kcal',
-          protein: '8g',
-          carbs: '49g',
-          fat: '3g'
-        }
-      },
-      {
-        id: 7,
-        name: 'Miel de Abeja Pura',
-        price: 9.99,
-        image:
-          'https://images.unsplash.com/photo-1587049352846-4a222e784l38?w=800&h=800&fit=crop',
-        description: 'Miel natural sin procesar',
-        category: 'Endulzantes',
-        longDescription:
-          'Miel de abeja 100% pura y natural, sin procesar ni pasteurizar. Recolectada de colmenas en zonas florales diversas, esta miel conserva todas sus propiedades naturales, enzimas y nutrientes. Perfecta para endulzar bebidas, postres o consumir directamente.',
-        stock: 0,
-        weight: '350g',
-        origin: 'Colombia',
-        rating: 4.9,
-        reviews: 187,
-        nutritionalInfo: {
-          calories: '304 kcal',
-          protein: '0.3g',
-          carbs: '82g',
-          fat: '0g'
-        }
-      },
-      {
-        id: 8,
-        name: 'Quinoa Orgánica Tricolor',
-        price: 8.99,
-        image:
-          'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=800&h=800&fit=crop',
-        description: 'Superalimento proteico',
-        category: 'Granos',
-        longDescription:
-          'Quinoa orgánica tricolor (blanca, roja y negra) cultivada en los Andes. Este superalimento es una excelente fuente de proteína completa, rica en aminoácidos esenciales, fibra y minerales. Perfecta como base para ensaladas, guarnición o plato principal vegetariano.',
-        stock: 55,
-        weight: '500g',
-        origin: 'Perú',
-        rating: 4.7,
-        reviews: 112,
-        nutritionalInfo: {
-          calories: '368 kcal',
-          protein: '14g',
-          carbs: '64g',
-          fat: '6g'
-        }
+    const fetchProducto = async () => {
+      try {
+        setLoading(true)
+        const productoBackend = await obtenerProducto(productId)
+        const productoMapeado = mapProductoToFront(productoBackend)
+        setProduct(productoMapeado)
+        setError(null)
+      } catch (err) {
+        console.error('Error al cargar producto:', err)
+        setError('No se pudo cargar el producto')
+        setProduct(null)
+      } finally {
+        setLoading(false)
       }
-    ]
+    }
 
-    const foundProduct = products.find((p) => p.id === parseInt(productId))
-    setProduct(foundProduct || null)
+    if (!isNaN(productId)) {
+      fetchProducto()
 
-    // Check if product is in favorites
-    const favorites = JSON.parse(localStorage.getItem('favorites') || '[]')
-    setIsFavorite(favorites.includes(parseInt(productId)))
+      // Check if product is in favorites
+      const favorites = JSON.parse(localStorage.getItem('favorites') || '[]')
+      setIsFavorite(favorites.includes(productId))
+    } else {
+      setError('ID de producto inválido')
+      setLoading(false)
+    }
   }, [productId])
 
   const addToCart = () => {
@@ -270,13 +137,27 @@ export default function ProductDetailPage({
     setIsFavorite(!isFavorite)
   }
 
-  if (!product) {
+  if (loading) {
     return (
       <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center'>
         <div className='text-center'>
-          <h2 className='text-2xl font-bold mb-4'>Producto no encontrado</h2>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4'></div>
+          <p className='text-gray-600'>Cargando producto...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !product) {
+    return (
+      <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center'>
+        <div className='text-center'>
+          <h2 className='text-2xl font-bold mb-4 text-red-600'>
+            {error || 'Producto no encontrado'}
+          </h2>
           <Link href='/'>
             <Button className='bg-gradient-to-r from-green-600 to-emerald-600'>
+              <ArrowLeft className='w-4 h-4 mr-2' />
               Volver a la tienda
             </Button>
           </Link>
@@ -288,20 +169,6 @@ export default function ProductDetailPage({
   return (
     <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100'>
       {/* Header */}
-      <header className='sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b shadow-sm'>
-        <div className='container mx-auto px-4 py-4'>
-          <div className='flex items-center justify-between'>
-            <Link href='/' className='flex items-center space-x-2'>
-              <div className='w-10 h-10 bg-gradient-to-br from-green-600 to-emerald-600 rounded-lg flex items-center justify-center'>
-                <span className='text-white font-bold text-xl'>S</span>
-              </div>
-              <h1 className='text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent'>
-                SmartStock
-              </h1>
-            </Link>
-          </div>
-        </div>
-      </header>
 
       {/* Product Detail */}
       <main className='container mx-auto px-4 py-8'>
@@ -351,28 +218,6 @@ export default function ProductDetailPage({
                   </div>
                 ) : null}
               </div>
-
-              {/* Action Buttons */}
-              <div className='flex gap-3'>
-                <Button
-                  onClick={toggleFavorite}
-                  variant='outline'
-                  className={`flex-1 h-12 ${
-                    isFavorite ? 'bg-red-50 border-red-300 text-red-600' : ''
-                  }`}
-                >
-                  <Heart
-                    className={`w-5 h-5 mr-2 ${
-                      isFavorite ? 'fill-red-600' : ''
-                    }`}
-                  />
-                  {isFavorite ? 'En Favoritos' : 'Agregar a Favoritos'}
-                </Button>
-                <Button variant='outline' className='flex-1 h-12'>
-                  <Share2 className='w-5 h-5 mr-2' />
-                  Compartir
-                </Button>
-              </div>
             </div>
 
             {/* Product Info */}
@@ -398,7 +243,7 @@ export default function ProductDetailPage({
               </div>
 
               <div className='text-5xl font-bold text-green-600 mb-6'>
-                ${product.price.toFixed(2)}
+                ${product.price}
               </div>
 
               <p className='text-gray-700 text-lg mb-6 leading-relaxed'>
@@ -523,9 +368,7 @@ export default function ProductDetailPage({
                 <ShoppingCart className='w-5 h-5 mr-2' />
                 {product.stock === 0
                   ? 'No Disponible'
-                  : `Agregar al Carrito - $${(product.price * quantity).toFixed(
-                      2
-                    )}`}
+                  : `Agregar al Carrito - $${product.price * quantity}`}
               </Button>
 
               {/* Mensaje de reabastecimiento */}
@@ -545,19 +388,6 @@ export default function ProductDetailPage({
                   </div>
                 </div>
               )}
-
-              {/* Shipping Info */}
-              <div className='mt-6 p-4 bg-blue-50 rounded-lg'>
-                <div className='flex items-start gap-3'>
-                  <Truck className='w-5 h-5 text-blue-600 mt-1' />
-                  <div>
-                    <p className='font-semibold text-blue-900'>Envío gratis</p>
-                    <p className='text-sm text-blue-700'>
-                      En pedidos superiores a $50.00
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
