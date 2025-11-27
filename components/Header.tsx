@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button'
 import { ShoppingCart, User, LogOut, Package, ShieldHalf } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import Notifications from './Notifications'
 
 interface HeaderProps {
-  user: { name: string; email: string } | null
+  user: { id?: number; name: string; email: string; rol?: string } | null
   totalItems: number
   onCartClick: () => void
   onLogout: () => void
@@ -61,25 +62,36 @@ export default function Header({
                   Mis Pedidos
                 </Button>
               </Link>
-              <Link href='/admin'>
-                <Button
-                  variant='ghost'
-                  className={`${
-                    pathname === '/admin'
-                      ? 'bg-green-50 text-green-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <ShieldHalf className='w-4 h-4 mr-2' />
-                  Admin
-                </Button>
-              </Link>
+              {user.rol === 'admin' && (
+                <Link href='/admin'>
+                  <Button
+                    variant='ghost'
+                    className={`${
+                      pathname === '/admin'
+                        ? 'bg-green-50 text-green-700'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <ShieldHalf className='w-4 h-4 mr-2' />
+                    Admin
+                  </Button>
+                </Link>
+              )}
             </nav>
           )}
 
           <div className='flex items-center gap-3'>
             {user ? (
               <div className='flex items-center gap-3'>
+                {/* Notificaciones - Solo para admins */}
+                {user.id && (
+                  <Notifications
+                    userId={user.id}
+                    userRole={user.rol || null}
+                    pollingInterval={30000}
+                  />
+                )}
+
                 {/* Dropdown móvil para navegación */}
                 <div className='md:hidden'>
                   <Link href='/pedidos'>
