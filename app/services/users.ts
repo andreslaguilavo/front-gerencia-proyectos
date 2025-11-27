@@ -28,6 +28,21 @@ export interface ActualizarUsuarioParcialRequest {
   activo?: boolean
 }
 
+export interface LoginRequest {
+  email: string
+  password: string
+}
+
+export interface LoginResponse {
+  mensaje: string
+  usuario: {
+    id: number
+    nombre: string
+    email: string
+    rol: string
+  }
+}
+
 // --- Servicios CRUD de Usuarios ---
 
 /**
@@ -104,7 +119,7 @@ export async function crearUsuario(
       email: usuario.email,
       rol: usuario.rol || 'user',
       activo: usuario.activo !== undefined ? usuario.activo : true,
-      password: usuario.password 
+      password: usuario.password
     })
   })
 
@@ -208,34 +223,50 @@ export async function eliminarUsuario(usuarioId: number): Promise<void> {
 }
 
 /**
- * Simular login (validación de credenciales)
- * Como el backend no maneja contraseñas, usamos "password" como contraseña fija
+ * Login de usuario - Valida email y contraseña con el backend
+ * POST /usuarios/login
  */
 export async function loginUsuario(
   email: string,
   password: string
 ): Promise<Usuario> {
-  // Validar contraseña fija
-  if (password !== 'password') {
-    throw new Error('Contraseña incorrecta')
+  const response = await fetch(`${API_BASE_URL}/usuarios/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      email,
+      password
+    })
+  })
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Credenciales inválidas')
+    }
+    const error = await response
+      .json()
+      .catch(() => ({ detail: response.statusText }))
+    throw new Error(
+      `Error al iniciar sesión: ${error.detail || response.statusText}`
+    )
   }
 
-  // Buscar usuario por email
-  const usuario = await obtenerUsuarioPorEmail(email)
+  const data: LoginResponse = await response.json()
 
-  if (!usuario) {
-    throw new Error('Usuario no encontrado')
+  // Convertir la respuesta del backend al formato Usuario
+  return {
+    id: data.usuario.id,
+    nombre: data.usuario.nombre,
+    email: data.usuario.email,
+    rol: data.usuario.rol as 'user' | 'admin',
+    activo: true // El backend no retorna este campo, asumimos true si login exitoso
   }
-
-  if (!usuario.activo) {
-    throw new Error('Usuario inactivo')
-  }
-
-  return usuario
 }
 
 /**
- * Registrar nuevo usuario (crear + login)
+ * Registrar nuevo usuario (crear + login automático)
  */
 export async function registrarUsuario(
   nombre: string,

@@ -18,7 +18,7 @@ import { useCart } from '@/context/CartContext'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { setUser } = useCart() // Obtener setUser del contexto
+  const { setUser } = useCart()
   const [isLogin, setIsLogin] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -36,7 +36,6 @@ export default function LoginPage() {
     const checkAuth = () => {
       const user = localStorage.getItem('user')
       if (user) {
-        // Si hay usuario logueado, redirigir al inicio
         router.push('/')
       } else {
         setCheckingAuth(false)
@@ -52,7 +51,7 @@ export default function LoginPage() {
 
     try {
       if (isLogin) {
-        // Validaciones de login
+        // ============= LOGIN =============
         if (!formData.email || !formData.password) {
           setError('Por favor completa todos los campos')
           return
@@ -65,6 +64,7 @@ export default function LoginPage() {
 
         setLoading(true)
 
+        // Llamar al endpoint real de login
         const usuario = await loginUsuario(formData.email, formData.password)
 
         // Crear objeto de usuario
@@ -84,7 +84,7 @@ export default function LoginPage() {
         // Redirigir a la página principal
         router.push('/')
       } else {
-        // Validaciones de registro
+        // ============= REGISTRO =============
         if (!formData.name || !formData.email || !formData.password) {
           setError('Por favor completa todos los campos')
           return
@@ -100,21 +100,23 @@ export default function LoginPage() {
           return
         }
 
+        if (formData.password.length < 6) {
+          setError('La contraseña debe tener al menos 6 caracteres')
+          return
+        }
+
         if (formData.password !== formData.confirmPassword) {
           setError('Las contraseñas no coinciden')
           return
         }
 
-        if (formData.password !== 'password') {
-          setError(
-            'Por seguridad, usa la contraseña temporal del sistema: "password"'
-          )
-          return
-        }
-
         setLoading(true)
 
-        const usuario = await registrarUsuario(formData.name, formData.email, formData.password)
+        const usuario = await registrarUsuario(
+          formData.name,
+          formData.email,
+          formData.password
+        )
 
         // Crear objeto de usuario
         const userData = {
@@ -134,14 +136,17 @@ export default function LoginPage() {
         router.push('/')
       }
     } catch (err) {
-      // Manejo de errores amigable
+      // Manejo de errores mejorado
       let errorMessage = 'Ocurrió un error inesperado'
 
       if (err instanceof Error) {
         const message = err.message.toLowerCase()
 
-        if (message.includes('contraseña incorrecta')) {
-          errorMessage = '❌ Contraseña incorrecta'
+        if (
+          message.includes('credenciales inválidas') ||
+          message.includes('contraseña incorrecta')
+        ) {
+          errorMessage = '❌ Email o contraseña incorrectos'
         } else if (message.includes('usuario no encontrado')) {
           errorMessage = '👤 No encontramos una cuenta con este email'
         } else if (message.includes('usuario inactivo')) {
@@ -262,16 +267,6 @@ export default function LoginPage() {
                 <AlertCircle className='w-5 h-5 text-red-600 flex-shrink-0 mt-0.5' />
                 <div className='flex-1'>
                   <p className='text-sm text-red-800 font-medium'>{error}</p>
-                  {error.includes('contraseña') && (
-                    <div className='mt-2 p-2 bg-red-100 rounded border border-red-200'>
-                      <p className='text-xs text-red-700'>
-                        💡 <strong>Contraseña temporal del sistema:</strong>{' '}
-                        <code className='bg-white px-2 py-1 rounded font-mono text-red-800'>
-                          password
-                        </code>
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -339,6 +334,7 @@ export default function LoginPage() {
                     placeholder='••••••••'
                     required
                     disabled={loading}
+                    minLength={6}
                   />
                   <button
                     type='button'
@@ -376,6 +372,7 @@ export default function LoginPage() {
                       placeholder='••••••••'
                       required={!isLogin}
                       disabled={loading}
+                      minLength={6}
                     />
                   </div>
                 </div>

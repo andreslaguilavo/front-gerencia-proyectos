@@ -68,7 +68,8 @@ export default function UsersManagement() {
           nombre: formData.nombre,
           email: formData.email,
           rol: 'admin',
-          activo: formData.activo
+          activo: formData.activo,
+          password: 'changeme' 
         })
         alert('Usuario creado exitosamente')
       }
