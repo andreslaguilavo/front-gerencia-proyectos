@@ -18,6 +18,7 @@ export interface CrearUsuarioRequest {
   email: string
   rol?: 'user' | 'admin'
   activo?: boolean
+  password: string
 }
 
 export interface ActualizarUsuarioParcialRequest {
@@ -102,7 +103,8 @@ export async function crearUsuario(
       nombre: usuario.nombre,
       email: usuario.email,
       rol: usuario.rol || 'user',
-      activo: usuario.activo !== undefined ? usuario.activo : true
+      activo: usuario.activo !== undefined ? usuario.activo : true,
+      password: usuario.password 
     })
   })
 
@@ -237,7 +239,8 @@ export async function loginUsuario(
  */
 export async function registrarUsuario(
   nombre: string,
-  email: string
+  email: string,
+  password: string
 ): Promise<Usuario> {
   // Verificar si el usuario ya existe
   const usuarioExistente = await obtenerUsuarioPorEmail(email)
@@ -251,7 +254,8 @@ export async function registrarUsuario(
     nombre,
     email,
     rol: 'user',
-    activo: true
+    activo: true,
+    password
   })
 
   return nuevoUsuario

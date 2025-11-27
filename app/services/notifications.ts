@@ -73,10 +73,12 @@ export async function obtenerNotificacionesPorUsuario(
     }
   )
 
+  if (response.status === 404) {
+    // Si no hay notificaciones, devolver array vacío
+    return []
+  }
+
   if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error(`Usuario con id=${usuarioId} no encontrado`)
-    }
     throw new Error(`Error al obtener notificaciones: ${response.statusText}`)
   }
 

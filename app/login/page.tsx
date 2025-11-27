@@ -114,7 +114,7 @@ export default function LoginPage() {
 
         setLoading(true)
 
-        const usuario = await registrarUsuario(formData.name, formData.email)
+        const usuario = await registrarUsuario(formData.name, formData.email, formData.password)
 
         // Crear objeto de usuario
         const userData = {
