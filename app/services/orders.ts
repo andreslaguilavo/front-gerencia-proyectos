@@ -10,6 +10,7 @@ export interface DetallePedido {
   cantidad: number
   precio_unitario: number | null
   pedido_id: number | null
+  subtotal: number | null
 }
 
 export interface Pedido {
@@ -72,7 +73,6 @@ export const estadoLabels: Record<PedidoFront['estado'], string> = {
 }
 
 // --- Servicios de Pedidos ---
-// NOTA: El backend NO tiene GET /pedidos/ para listar todos
 
 /**
  * Crear un nuevo pedido
@@ -88,10 +88,8 @@ export async function crearPedido(pedido: CrearPedidoRequest): Promise<Pedido> {
       producto_id: item.producto_id,
       cantidad: item.cantidad,
       precio_unitario: item.precio_unitario ?? null
-      // NO enviar pedido_id, se asigna en el backend
     })),
     total: 0 // El backend lo calcula
-    // NO enviar id, PostgreSQL lo genera con SERIAL
   }
 
   const response = await fetch(`${API_BASE_URL}/pedidos/`, {
@@ -131,6 +129,30 @@ export async function obtenerPedido(pedidoId: number): Promise<Pedido> {
       throw new Error(`Pedido con id=${pedidoId} no encontrado`)
     }
     throw new Error(`Error al obtener pedido: ${response.statusText}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Obtener pedidos por usuario
+ * GET /pedidos/usuario/{usuario_id}
+ */
+export async function obtenerPedidosPorUsuario(
+  usuarioId: number
+): Promise<Pedido[]> {
+  const response = await fetch(`${API_BASE_URL}/pedidos/usuario/${usuarioId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error(`Usuario con id=${usuarioId} no encontrado`)
+    }
+    throw new Error(`Error al obtener pedidos: ${response.statusText}`)
   }
 
   return response.json()

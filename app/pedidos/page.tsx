@@ -11,11 +11,19 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowLeft,
-  ShoppingBag
+  ShoppingBag,
+  RefreshCw
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { PedidoFront, estadoColors, estadoLabels } from '@/app/services/orders'
+import {
+  PedidoFront,
+  estadoColors,
+  estadoLabels,
+  obtenerPedidosPorUsuario,
+  Pedido
+} from '@/app/services/orders'
+import { obtenerProducto } from '@/app/services/products'
 
 export default function OrdersPage() {
   const router = useRouter()
@@ -31,52 +39,89 @@ export default function OrdersPage() {
   } | null>(null)
 
   useEffect(() => {
-    // Verificar si hay usuario logueado
-    const savedUser = localStorage.getItem('user')
-    if (!savedUser) {
-      // Si no hay usuario, redirigir al login
-      router.push('/login')
-      return
-    }
-
-    setUser(JSON.parse(savedUser))
-
-    // Cargar pedidos del localStorage
-    const loadOrders = () => {
-      try {
-        setLoading(true)
-
-        const pedidosLocal = localStorage.getItem('orders')
-
-        if (pedidosLocal) {
-          const pedidos: PedidoFront[] = JSON.parse(pedidosLocal)
-
-          // Filtrar pedidos del usuario actual
-          const userFromStorage = JSON.parse(savedUser)
-          const pedidosUsuario = userFromStorage.id
-            ? pedidos.filter((p) => p.usuario_id === userFromStorage.id)
-            : pedidos
-
-          // Ordenar por ID descendente (más recientes primero)
-          pedidosUsuario.sort((a, b) => b.id - a.id)
-
-          setOrders(pedidosUsuario)
-        } else {
-          setOrders([])
-        }
-
-        setError(null)
-      } catch (err) {
-        console.error('Error al cargar pedidos:', err)
-        setError('No se pudieron cargar los pedidos.')
-        setOrders([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadOrders()
   }, [router])
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Verificar si hay usuario logueado
+      const savedUser = localStorage.getItem('user')
+      if (!savedUser) {
+        router.push('/login')
+        return
+      }
+
+      const userData = JSON.parse(savedUser)
+      setUser(userData)
+
+      // Si el usuario no tiene ID, no puede obtener pedidos
+      if (!userData.id) {
+        setOrders([])
+        setLoading(false)
+        return
+      }
+
+      // Obtener pedidos del backend
+      const pedidosBackend = await obtenerPedidosPorUsuario(userData.id)
+
+      // Mapear pedidos del backend al formato del frontend
+      const pedidosMapeados: PedidoFront[] = await Promise.all(
+        pedidosBackend.map(async (pedido) => {
+          // Enriquecer items con nombres de productos
+          const itemsEnriquecidos = await Promise.all(
+            pedido.items.map(async (item) => {
+              try {
+                const producto = await obtenerProducto(item.producto_id)
+                return {
+                  producto_id: item.producto_id,
+                  producto_nombre: producto.nombre,
+                  cantidad: item.cantidad,
+                  precio_unitario: item.precio_unitario ?? 0,
+                  subtotal: item.subtotal ?? 0
+                }
+              } catch {
+                // Si falla obtener el producto, usar nombre genérico
+                return {
+                  producto_id: item.producto_id,
+                  producto_nombre: `Producto #${item.producto_id}`,
+                  cantidad: item.cantidad,
+                  precio_unitario: item.precio_unitario ?? 0,
+                  subtotal: item.subtotal ?? 0
+                }
+              }
+            })
+          )
+
+          return {
+            id: pedido.id ?? 0,
+            usuario_id: pedido.usuario_id,
+            estado: pedido.estado,
+            items: itemsEnriquecidos,
+            total: pedido.total,
+            fecha: new Date().toISOString() // El backend no retorna fecha aún
+          }
+        })
+      )
+
+      // Ordenar por ID descendente (más recientes primero)
+      pedidosMapeados.sort((a, b) => b.id - a.id)
+
+      setOrders(pedidosMapeados)
+    } catch (err) {
+      console.error('Error al cargar pedidos:', err)
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudieron cargar los pedidos.'
+      )
+      setOrders([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const toggleOrderExpansion = (orderId: number) => {
     setExpandedOrders((prev) => {
@@ -136,6 +181,14 @@ export default function OrdersPage() {
                 </p>
               )}
             </div>
+            <Button
+              onClick={loadOrders}
+              variant='outline'
+              className='flex items-center gap-2'
+            >
+              <RefreshCw className='w-4 h-4' />
+              Actualizar
+            </Button>
           </div>
         </div>
 
@@ -166,9 +219,6 @@ export default function OrdersPage() {
               const isExpanded = expandedOrders.has(order.id)
               const colors = estadoColors[order.estado]
 
-              // Generar número de pedido aleatorio entre 1 y 1,000,000
-              const randomOrderNumber = Math.floor(Math.random() * 1000000) + 1
-
               return (
                 <div
                   key={order.id}
@@ -186,8 +236,7 @@ export default function OrdersPage() {
                         </div>
                         <div>
                           <h3 className='font-bold text-lg'>
-                            Pedido #
-                            {randomOrderNumber.toString().padStart(6, '0')}
+                            Pedido #{order.id.toString().padStart(6, '0')}
                           </h3>
                           <p className='text-sm text-gray-600'>
                             {new Date(order.fecha).toLocaleDateString('es-ES', {
